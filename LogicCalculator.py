@@ -31,6 +31,8 @@ class data_struct():
         ui.display2.clear()
         ui.display3.clear()
         ui.display4.setModel(QStandardItemModel())
+        if self.expressions:
+            self.tablecalc()
     
     def add_exp(self, exp, flag = True):
         ui.undo.setEnabled(True)
@@ -218,18 +220,16 @@ class mywindow(QMainWindow):
     def __init__(self):
         super(mywindow, self).__init__(None)
 
-def ui_setup():
+def ui_setup(lst = []):
     global ui
     
-    import compileUi
     import gui
     app = QApplication(sys.argv)
     MainWindow = mywindow()
     ui = gui.Ui_MainWindow()
     ui.setupUi(MainWindow)
 
-    data = data_struct(['(', 'a', '→', 'b', '∨', 'b', ')' ,'∧', 'c'])
-    data.tablecalc()
+    data = data_struct(lst)
 
     def confirm_input():
         var = ui.varinput.toPlainText()
@@ -291,4 +291,6 @@ def ui_setup():
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
-    ui_setup()
+    import compileUi
+    ui_setup(['(', 'a', '→', 'b', '∨', 'b', ')' ,'∧', 'c'])
+    #ui_setup()
