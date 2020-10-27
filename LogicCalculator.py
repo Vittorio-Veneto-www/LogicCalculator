@@ -1,5 +1,4 @@
 import sys
-from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -11,19 +10,33 @@ class data_struct():
     def __init__(self, expressions = []):
         self.ops = {'¬':3, '∧':2, '∨':2, '→':1, '↔':1, '(':0, ')':0, '()':0}
         self.expressions = expressions
-        self.variableset = set()
+        self.variabledict = {}
         self.variablepos = {}
         for exp in expressions:
-            if not exp in self.ops and not (exp in self.variableset) and exp != '0' and exp != '1':
-                self.variableset.add(exp)
-                self.variablepos[exp] = len(self.variablepos)
+            if not exp in self.ops and exp != '0' and exp != '1':
+                if exp in self.variabledict:
+                    self.variabledict[exp] += 1
+                else:
+                    self.variabledict[exp] = 1
+                    self.variablepos[exp] = len(self.variablepos)
         self.cursor = len(self.expressions)
         self.table = []
         self.expressions.insert(self.cursor, '_')
         ui.textBrowser.setText(" ".join(self.expressions))
         self.expressions.pop(self.cursor)
+        ui.undo.setEnabled(expressions != [])
+        ui.redo.setEnabled(False)
+        self.redolist = []
+        ui.display1.setModel(QStandardItemModel())
+        ui.display2.clear()
+        ui.display3.clear()
+        ui.display4.setModel(QStandardItemModel())
     
-    def add_exp(self, exp):
+    def add_exp(self, exp, flag = True):
+        ui.undo.setEnabled(True)
+        if flag:
+            ui.redo.setEnabled(False)
+            self.redolist = []
         valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
         if self.expressions:
             if exp == '(':
@@ -44,9 +57,12 @@ class data_struct():
                     self.cursor += 1
             else:
                 if self.expressions[self.cursor - 1] in valid_ops:
-                    if not (exp in self.variableset) and exp != '0' and exp != '1':
-                        self.variableset.add(exp)
-                        self.variablepos[exp] = len(self.variablepos)
+                    if exp != '0' and exp != '1':
+                        if exp in self.variabledict:
+                            self.variabledict[exp] += 1
+                        else:
+                            self.variabledict[exp] = 1
+                            self.variablepos[exp] = len(self.variablepos)
                     self.expressions.insert(self.cursor, exp)
                     self.cursor += 1
                     self.tablecalc()
@@ -63,15 +79,51 @@ class data_struct():
             elif exp in self.ops:
                 pass
             else:
-                if not (exp in self.variableset) and exp != '0' and exp != '1':
-                    self.variableset.add(exp)
-                    self.variablepos[exp] = len(self.variablepos)
+                if exp != '0' and exp != '1':
+                    if exp in self.variabledict:
+                        self.variabledict[exp] += 1
+                    else:
+                        self.variabledict[exp] = 1
+                        self.variablepos[exp] = len(self.variablepos)
                 self.expressions.insert(self.cursor, exp)
                 self.cursor += 1
                 self.tablecalc()
         self.expressions.insert(self.cursor, '_')
         ui.textBrowser.setText(" ".join(self.expressions))
         self.expressions.pop(self.cursor)
+    
+    def undo(self):
+        valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
+        if self.expressions:
+            self.cursor -= 1
+            exp = self.expressions[self.cursor]
+            if exp != ')':
+                self.expressions.pop(self.cursor)
+            if exp == '(':
+                self.expressions.pop(self.cursor)
+            if not (exp in self.ops or exp == '0' or exp == '1'):
+                self.variabledict[exp] -= 1
+                if not self.variabledict[exp]:
+                    del(self.variabledict[exp])
+                    del(self.variablepos[exp])
+            if self.cursor:
+                if not (self.expressions[self.cursor - 1] in valid_ops):
+                    self.tablecalc()
+            else:
+                lst = self.redolist
+                self.__init__()
+                ui.redo.setEnabled(True)
+                self.redolist = lst
+        
+        self.expressions.insert(self.cursor, '_')
+        ui.textBrowser.setText(" ".join(self.expressions))
+        self.expressions.pop(self.cursor)
+        ui.redo.setEnabled(True)
+        self.redolist.append(exp)
+    
+    def redo(self):
+        self.add_exp(self.redolist.pop(), False)
+        ui.redo.setEnabled(self.redolist != [])
 
     def tablecalc(self):
         revexp = self.expressions.copy()
@@ -138,8 +190,8 @@ class data_struct():
         result = calc(convert_list)
         model=QStandardItemModel()
         model.setHorizontalHeaderLabels([(lambda x:" ".join(x[0]))(_) for _ in self.table])
-        model.setVerticalHeaderLabels(["m" + str(_) for _ in range(2 ** len(self.variableset))])
-        for row in range(2 ** len(self.variableset)):
+        model.setVerticalHeaderLabels(["m" + str(_) for _ in range(2 ** len(self.variabledict))])
+        for row in range(2 ** len(self.variabledict)):
             for col in range(len(self.table)):
                 model.setItem(row, col, QStandardItem("1" if self.table[col][1][row] else "0"))
                 model.item(row, col).setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
@@ -222,6 +274,18 @@ def ui_setup():
     ui.fast_q.clicked.connect(medias[-1].input)
     medias.append(inputmedia("r"))
     ui.fast_r.clicked.connect(medias[-1].input)
+    ui.undo.triggered.connect(data.undo)
+    ui.redo.triggered.connect(data.redo)
+    ui.backspace.triggered.connect(data.undo)
+
+    def instruction():
+        x = QWidget()
+        QMessageBox.information(x, "", "使用指南:\n本计算器可以实现计算逻辑表达式的真值表，主析取/合取范式" +
+            "以及自动化简\n为了保证逻辑运算式的正确性，只能通过提供的键盘进行输入，下划线为光标，代表表达式当" +
+            "前的输入位置；点击abcpqr可以快速输入对应自由变量，也可以通过输入框输入任意字符串作为自由变量；" +
+            "此外还提供逻辑运算符的快速输入\n请注意本程序没有对表达式的编辑功能，若想修改请使用撤销、" +
+            "重做和退格进行编辑操作", QMessageBox.Yes)
+    ui.instruction.triggered.connect(instruction)
 
     MainWindow.show()
     sys.exit(app.exec_())

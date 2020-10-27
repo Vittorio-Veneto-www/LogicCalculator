@@ -440,8 +440,17 @@
     </property>
     <addaction name="undo"/>
     <addaction name="redo"/>
+    <addaction name="separator"/>
+    <addaction name="backspace"/>
+   </widget>
+   <widget class="QMenu" name="menu_2">
+    <property name="title">
+     <string>帮助</string>
+    </property>
+    <addaction name="instruction"/>
    </widget>
    <addaction name="menu"/>
+   <addaction name="menu_2"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="mode1">
@@ -484,6 +493,19 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+Z</string>
+   </property>
+  </action>
+  <action name="instruction">
+   <property name="text">
+    <string>说明</string>
+   </property>
+  </action>
+  <action name="backspace">
+   <property name="text">
+    <string>退格</string>
+   </property>
+   <property name="shortcut">
+    <string>Backspace</string>
    </property>
   </action>
  </widget>
