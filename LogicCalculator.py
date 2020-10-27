@@ -126,10 +126,10 @@ class data_struct():
                         for _ in range(len(x[1]))], x[2] + [exp] + y[2]))(calc(expressions), calc(expressions)))
                 elif exp == '→':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [not x[1][_] or y[1][_]\
-                        for _ in range(len(x[1]))], ['¬'] + x[2] + ['∨'] + y[2]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))], ['¬', '('] + x[2] + [')', '∨', '('] + y[2] + [')']))(calc(expressions), calc(expressions)))
                 elif exp == '↔':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [(not x[1][_] or y[1][_]) and (x[1][_] or not y[1][_])\
-                        for _ in range(len(x[1]))], ['(', '¬'] + x[2] + ['∨'] + y[2] + [')', '∧', '('] + x[2] + ['∨', '¬'] + y[2] + [')']))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))], ['(', '¬', '('] + x[2] + [')', '∨', '('] + y[2] + [')', ')', '∧', '(', '('] + x[2] + [')', '∨', '¬', '('] + y[2] + [')', ')']))(calc(expressions), calc(expressions)))
 
         self.table = []
         for exp in self.variablepos.keys():
