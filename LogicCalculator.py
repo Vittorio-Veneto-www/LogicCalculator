@@ -98,8 +98,6 @@ class data_struct():
         while op_stack:
             convert_list.append(op_stack.pop())
         
-        print(convert_list)
-        
         def calc(expressions):
             
             nonlocal self
@@ -110,33 +108,33 @@ class data_struct():
 
             exp = expressions.pop()
             if exp == '0' or exp == '1':
-                return [exp], [exp == '1' for _ in range(2 ** len(self.variablepos))]
+                return [exp], [exp == '1' for _ in range(2 ** len(self.variablepos))], [exp]
             elif exp in self.variablepos:
                 return [exp], [_ & 1 << (len(self.variablepos) - self.variablepos[exp] - 1)\
-                    for _ in range(2 ** len(self.variablepos))]
+                    for _ in range(2 ** len(self.variablepos))], [exp]
             else:
                 if exp == '¬':
-                    return printans((lambda x:([exp] + x[0], [not _ for _ in x[1]]))(calc(expressions)))
+                    return printans((lambda x:([exp] + x[0], [not _ for _ in x[1]], [exp] + x[2]))(calc(expressions)))
                 elif exp == '()':
-                    return (lambda x:(['('] + x[0] + [')'], x[1]))(calc(expressions))
+                    return (lambda x:(['('] + x[0] + [')'], x[1], ['('] + x[2] + [')']))(calc(expressions))
                 elif exp == '∧':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [x[1][_] and y[1][_]\
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))], x[2] + [exp] + y[2]))(calc(expressions), calc(expressions)))
                 elif exp == '∨':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [x[1][_] or y[1][_] \
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))], x[2] + [exp] + y[2]))(calc(expressions), calc(expressions)))
                 elif exp == '→':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [not x[1][_] or y[1][_]\
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))], ['¬'] + x[2] + ['∨'] + y[2]))(calc(expressions), calc(expressions)))
                 elif exp == '↔':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [(not x[1][_] or y[1][_]) and (x[1][_] or not y[1][_])\
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))], ['(', '¬'] + x[2] + ['∨'] + y[2] + [')', '∧', '('] + x[2] + ['∨', '¬'] + y[2] + [')']))(calc(expressions), calc(expressions)))
 
         self.table = []
         for exp in self.variablepos.keys():
             self.table.append(([exp], [_ & 1 << (len(self.variablepos) - self.variablepos[exp] - 1)\
                 for _ in range(2 ** len(self.variablepos))]))
-        calc(convert_list)
+        result = calc(convert_list)
         model=QStandardItemModel()
         model.setHorizontalHeaderLabels([(lambda x:" ".join(x[0]))(_) for _ in self.table])
         model.setVerticalHeaderLabels(["m" + str(_) for _ in range(2 ** len(self.variableset))])
@@ -154,6 +152,14 @@ class data_struct():
             if self.table[-1][1][_]:
                 lst.append("m" + str(_))
         ui.display2.setText(" ∨ ".join(lst))
+        lst = []
+        for _ in range(2 ** len(self.variablepos)):
+            if not self.table[-1][1][_]:
+                lst.append("m" + str(_))
+        ui.display3.setText(" ∧ ".join(lst))
+        model1=QStandardItemModel()
+        model1.setItem(0, 0, QStandardItem(" ".join(result[2])))
+        ui.display4.setModel(model1)
 
 class mywindow(QMainWindow):
     def __init__(self):
