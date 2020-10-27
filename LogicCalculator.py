@@ -24,25 +24,26 @@ class data_struct():
         self.expressions.pop(self.cursor)
     
     def add_exp(self, exp):
+        valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
         if self.expressions:
             if exp == '(':
-                if self.expressions[self.cursor - 1] in self.ops:
+                if self.expressions[self.cursor - 1] in valid_ops:
                     self.expressions.insert(self.cursor, ')')
                     self.expressions.insert(self.cursor, '(')
                     self.cursor += 1
             elif exp == ')':
-                if self.cursor < len(self.expressions):
+                if self.cursor < len(self.expressions) and self.expressions[self.cursor - 1] != '(':
                     self.cursor += 1
             elif exp == '¬':
-                if self.expressions[self.cursor - 1] in self.ops:
+                if self.expressions[self.cursor - 1] in valid_ops:
                     self.expressions.insert(self.cursor, exp)
                     self.cursor += 1
             elif exp in self.ops:
-                if not (self.expressions[self.cursor - 1] in self.ops):
+                if not (self.expressions[self.cursor - 1] in valid_ops):
                     self.expressions.insert(self.cursor, exp)
                     self.cursor += 1
             else:
-                if self.expressions[self.cursor - 1] in self.ops:
+                if self.expressions[self.cursor - 1] in valid_ops:
                     if not (exp in self.variableset) and exp != '0' and exp != '1':
                         self.variableset.add(exp)
                         self.variablepos[exp] = len(self.variablepos)
