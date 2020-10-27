@@ -149,6 +149,11 @@ class data_struct():
                 model.item(row, col).setFont(font)
         ui.display1.setModel(model)
         ui.display1.show()
+        lst = []
+        for _ in range(2 ** len(self.variablepos)):
+            if self.table[-1][1][_]:
+                lst.append("m" + str(_))
+        ui.display2.setText(" ∨ ".join(lst))
 
 class mywindow(QMainWindow):
     def __init__(self):
