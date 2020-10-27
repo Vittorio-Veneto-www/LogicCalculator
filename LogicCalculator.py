@@ -150,15 +150,9 @@ class data_struct():
         ui.display1.setModel(model)
         ui.display1.show()
 
-
 class mywindow(QMainWindow):
     def __init__(self):
         super(mywindow, self).__init__(None)
-
-'''class tablemodel(QAbstractTableModel):
-    def __init__(self, data_, parent=None):
-        super(tablemodel, self).__init__(parent)
-        self = data_'''
 
 def ui_setup():
     global ui
