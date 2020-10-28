@@ -25,6 +25,7 @@ class data_struct():
         ui.textBrowser.setText(" ".join(self.expressions))
         self.expressions.pop(self.cursor)
         ui.undo.setEnabled(expressions != [])
+        ui.backspace.setEnabled(expressions != [])
         ui.redo.setEnabled(False)
         self.redolist = []
         ui.display1.setModel(QStandardItemModel())
@@ -36,6 +37,7 @@ class data_struct():
     
     def add_exp(self, exp, flag = True):
         ui.undo.setEnabled(True)
+        ui.backspace.setEnabled(True)
         if flag:
             ui.redo.setEnabled(False)
             self.redolist = []
@@ -128,30 +130,34 @@ class data_struct():
         ui.redo.setEnabled(self.redolist != [])
 
     def tablecalc(self):
-        revexp = self.expressions.copy()
-        revexp.reverse()
-        convert_list, op_stack = [], []
-        for exp in revexp:
-            if exp in self.ops:
-                if exp == ')':
-                    op_stack.append(exp)
-                elif exp == '(':
-                    while True:
-                        op = op_stack.pop()
-                        if op ==')':
-                            break
-                        convert_list.append(op)
-                    convert_list.append('()')
-                elif exp == '¬':
-                    convert_list.append(exp)
+
+        def reverse_calc(revexp):
+            revexp.reverse()
+            convert_list, op_stack = [], []
+            for exp in revexp:
+                if exp in self.ops:
+                    if exp == ')':
+                        op_stack.append(exp)
+                    elif exp == '(':
+                        while True:
+                            op = op_stack.pop()
+                            if op ==')':
+                                break
+                            convert_list.append(op)
+                        convert_list.append('()')
+                    elif exp == '¬':
+                        convert_list.append(exp)
+                    else:
+                        while op_stack and self.ops[op_stack[-1]] > self.ops[exp]:
+                            convert_list.append(op_stack.pop())
+                        op_stack.append(exp)
                 else:
-                    while op_stack and self.ops[op_stack[-1]] > self.ops[exp]:
-                        convert_list.append(op_stack.pop())
-                    op_stack.append(exp)
-            else:
-                convert_list.append(exp)
-        while op_stack:
-            convert_list.append(op_stack.pop())
+                    convert_list.append(exp)
+            while op_stack:
+                convert_list.append(op_stack.pop())
+            return convert_list
+        
+        convert_list = reverse_calc(self.expressions.copy())
         
         def calc(expressions):
             
@@ -163,33 +169,33 @@ class data_struct():
 
             exp = expressions.pop()
             if exp == '0' or exp == '1':
-                return [exp], [exp == '1' for _ in range(2 ** len(self.variablepos))], [exp]
+                return [exp], [exp == '1' for _ in range(2 ** len(self.variablepos))]
             elif exp in self.variablepos:
                 return [exp], [_ & 1 << (len(self.variablepos) - self.variablepos[exp] - 1)\
-                    for _ in range(2 ** len(self.variablepos))], [exp]
+                    for _ in range(2 ** len(self.variablepos))]
             else:
                 if exp == '¬':
-                    return printans((lambda x:([exp] + x[0], [not _ for _ in x[1]], [exp] + x[2]))(calc(expressions)))
+                    return printans((lambda x:([exp] + x[0], [not _ for _ in x[1]]))(calc(expressions)))
                 elif exp == '()':
-                    return (lambda x:(['('] + x[0] + [')'], x[1], ['('] + x[2] + [')']))(calc(expressions))
+                    return (lambda x:(['('] + x[0] + [')'], x[1]))(calc(expressions))
                 elif exp == '∧':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [x[1][_] and y[1][_]\
-                        for _ in range(len(x[1]))], x[2] + [exp] + y[2]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
                 elif exp == '∨':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [x[1][_] or y[1][_] \
-                        for _ in range(len(x[1]))], x[2] + [exp] + y[2]))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
                 elif exp == '→':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [not x[1][_] or y[1][_]\
-                        for _ in range(len(x[1]))], ['¬', '('] + x[2] + [')', '∨', '('] + y[2] + [')']))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
                 elif exp == '↔':
                     return printans((lambda x, y:(x[0] + [exp] + y[0], [(not x[1][_] or y[1][_]) and (x[1][_] or not y[1][_])\
-                        for _ in range(len(x[1]))], ['(', '¬', '('] + x[2] + [')', '∨', '('] + y[2] + [')', ')', '∧', '(', '('] + x[2] + [')', '∨', '¬', '('] + y[2] + [')', ')']))(calc(expressions), calc(expressions)))
+                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
 
         self.table = []
         for exp in self.variablepos.keys():
             self.table.append(([exp], [_ & 1 << (len(self.variablepos) - self.variablepos[exp] - 1)\
                 for _ in range(2 ** len(self.variablepos))]))
-        result = calc(convert_list)
+        calc(convert_list.copy())
         model=QStandardItemModel()
         model.setHorizontalHeaderLabels([(lambda x:" ".join(x[0]))(_) for _ in self.table])
         model.setVerticalHeaderLabels(["m" + str(_) for _ in range(2 ** len(self.variabledict))])
@@ -213,8 +219,60 @@ class data_struct():
             if not self.table[-1][1][_]:
                 lst.append("m" + str(_))
         ui.display3.setText(" ∧ ".join(lst))
+        
+        def braket(x):
+            return x if len(x) == 1 else ['('] + x + [')']
+
+        def convert(expressions):
+            
+            nonlocal self
+
+            exp = expressions.pop()
+            if exp == '0' or exp == '1':
+                return ([exp],)
+            elif exp in self.variablepos:
+                return ([exp],)
+            else:
+                if exp == '¬':
+                    return (lambda x:([exp] + x[0],))(convert(expressions))
+                elif exp == '()':
+                    return (lambda x:(braket(x[0]),))(convert(expressions))
+                elif exp == '∧':
+                    return (lambda x, y:(braket(x[0]) + [exp] + braket(y[0]),))(convert(expressions), convert(expressions))
+                elif exp == '∨':
+                    return (lambda x, y:(braket(x[0]) + [exp] + braket(y[0]),))(convert(expressions), convert(expressions))
+                elif exp == '→':
+                    return (lambda x, y:(['¬'] + braket(x[0]) + ['∨'] + braket(y[0]),))\
+                        (convert(expressions), convert(expressions))
+                elif exp == '↔':
+                    return (lambda x, y:(braket(['¬'] + braket(x[0]) + ['∨'] + braket(y[0])) + ['∧']\
+                          + braket(braket(x[0]) + ['∨', '¬'] + braket(y[0])),))(convert(expressions),\
+                              convert(expressions))
+
+        def convert1(expressions):
+            
+            nonlocal self
+
+            exp = expressions.pop()
+            if exp == '0' or exp == '1':
+                return ([exp],)
+            elif exp in self.variablepos:
+                return ([exp],)
+            else:
+                if exp == '¬':
+                    return (lambda x:([exp] + x[0],))(convert1(expressions))
+                elif exp == '()':
+                    return (lambda x:(braket(x[0]),))(convert1(expressions))
+                elif exp == '∧':
+                    return (lambda x, y:(braket(x[0]) + [exp] + braket(y[0]),))(convert1(expressions), convert1(expressions))
+                elif exp == '∨':
+                    return (lambda x, y:(['¬'] + braket(['¬'] + braket(x[0]) + ['∧', '¬'] + braket(y[0])),))(convert1(expressions), convert1(expressions))
+
+        result1 = convert(convert_list.copy())
+        result2 = convert1(reverse_calc(result1[0].copy()))
         model1=QStandardItemModel()
-        model1.setItem(0, 0, QStandardItem(" ".join(result[2])))
+        model1.setItem(0, 0, QStandardItem(" ".join(result1[0])))
+        model1.setItem(1, 0, QStandardItem(" ".join(result2[0])))
         ui.display4.setModel(model1)
 
 class mywindow(QMainWindow):
