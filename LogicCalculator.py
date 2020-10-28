@@ -201,6 +201,7 @@ class data_struct():
                 font.setPointSize(10)
                 model.item(row, col).setFont(font)
         ui.display1.setModel(model)
+        ui.display1.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         ui.display1.show()
         lst = []
         for _ in range(2 ** len(self.variablepos)):
