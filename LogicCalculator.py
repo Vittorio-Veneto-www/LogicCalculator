@@ -294,4 +294,3 @@ def ui_setup(lst = []):
 if __name__ == '__main__':
     import compileUi
     ui_setup(['(', 'a', '→', 'b', '∨', 'b', ')' ,'∧', 'c'])
-    #ui_setup()
