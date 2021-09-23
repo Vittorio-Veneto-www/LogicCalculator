@@ -4,6 +4,7 @@
 使用指南:
 
 本程序使用pyqt5编写，使用前请先安装pyqt5，安装命令为pip install pyqt5 -i pypi.tuna.tsinghua.edu.cn/simple/
+
 也可以直接运行Release中的exe文件
 
 本计算器可以实现计算逻辑表达式的真值表，主析取/合取范式以及自动化简
