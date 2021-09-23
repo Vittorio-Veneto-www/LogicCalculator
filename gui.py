@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'd:\vscode\Python\LogicCalculator\./gui.ui'
+# Form implementation generated from reading ui file 'D:\vscode\Python\LogicCalculator\./gui.ui'
 #
 # Created by: PyQt5 UI code generator 5.13.0
 #
