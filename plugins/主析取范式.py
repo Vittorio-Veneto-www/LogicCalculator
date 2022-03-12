@@ -40,6 +40,8 @@ def TableCalc(variablepos, convert_list):
     return table
 
 def exec(expressions, variablepos, PostfixExpression):
+    if not expressions:
+        return ""
     table = TableCalc(variablepos, PostfixExpression(expressions))
     lst = []
     for _ in range(2 ** len(variablepos)):

@@ -46,6 +46,8 @@ def convert1(expressions):
             return (lambda x, y:(['¬'] + braket(['¬'] + braket(x[0]) + ['∧', '¬'] + braket(y[0])),))(convert1(expressions), convert1(expressions))
 
 def exec(expressions, variablepos, PostfixExpression):
+    if not expressions:
+        return []
     global variablep
     variablep = variablepos
     result1 = convert(PostfixExpression(expressions).copy())

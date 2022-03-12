@@ -40,6 +40,8 @@ def TableCalc(variablepos, convert_list):
     return table
 
 def exec(expressions, variablepos, PostfixExpression):
+    if not expressions:
+        return ([], [], None)
     table = TableCalc(variablepos, PostfixExpression(expressions))
     hLabels, vLabels = [" ".join(_[0]) for _ in table], ["m" + str(_) for _ in range(len(table[0][1]))]
     table = [_[1] for _ in table]

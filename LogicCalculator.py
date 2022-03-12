@@ -197,9 +197,7 @@ class data_struct():
                 if not (self.expressions[self.cursor - 1] in valid_ops):
                     Update()
             else:
-                lst = self.redolist
-                self.__init__()
-                self.redolist = lst
+                Update()
         
         self.expressions.insert(self.cursor, '_')
         self.ExpressionToText()
