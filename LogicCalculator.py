@@ -12,6 +12,8 @@ displays = []
 
 def LoadPlugins():
     PATH = os.path.join(os.path.dirname(__file__), "plugins")
+    if not os.path.exists(PATH):
+        return
     pluginList = []
     for f in os.listdir(PATH):
         if os.path.isfile(os.path.join(PATH, f)) and f.endswith(".py"):
@@ -33,6 +35,8 @@ def LoadPlugins():
         pluginModules.append(plugin)
 
 def Update():
+    if not pluginModules:
+        return
     index = ui.tabWidget.currentIndex()
     result = pluginModules[index].exec(data.expressions, data.variablepos, PostfixExpression)
     if pluginModules[index].TYPE == "Text":
