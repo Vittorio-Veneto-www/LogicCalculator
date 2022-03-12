@@ -278,7 +278,8 @@ def ui_setup():
     MainWindow.show()
     sys.exit(app.exec_())
 
-if __name__ == '__main__':
+def run():
+    global app, MainWindow, ui, data
     app = QApplication(sys.argv)
     MainWindow = QMainWindow()
     # import compileUi
@@ -291,3 +292,6 @@ if __name__ == '__main__':
     data = data_struct(initalList)
 
     ui_setup()
+
+if __name__ == '__main__':
+    run()
