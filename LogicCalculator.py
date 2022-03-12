@@ -1,19 +1,105 @@
-import sys
+import os, sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+
+ops = {'¬':3, '∧':2, '∨':2, '→':1, '↔':1, '(':0, ')':0, '()':0}
+valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
+pluginModules = []
+displays = []
+
+def LoadPlugins():
+    PATH = os.path.join(os.path.dirname(__file__), "plugins")
+    pluginList = []
+    for f in os.listdir(PATH):
+        if os.path.isfile(os.path.join(PATH, f)) and f.endswith(".py"):
+            pluginList.append(os.path.join(PATH, f))
+    import importlib.util
+    for pluginPath in pluginList:
+        spec = importlib.util.spec_from_file_location("plugins", pluginPath)
+        plugin = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(plugin)
+        if plugin.TYPE == "Text":
+            displays.append(QTextBrowser())
+        elif plugin.TYPE == "List":
+            displays.append(QListView())
+            displays[-1].setModel(QStandardItemModel())
+        elif plugin.TYPE == "Table":
+            displays.append(QTableView())
+            displays[-1].setModel(QStandardItemModel())
+        ui.tabWidget.addTab(displays[-1], plugin.NAME)
+        pluginModules.append(plugin)
+
+def Update():
+    index = ui.tabWidget.currentIndex()
+    result = pluginModules[index].exec(data.expressions, data.variablepos, PostfixExpression)
+    if pluginModules[index].TYPE == "Text":
+        displays[index].setText(result)
+    elif pluginModules[index].TYPE == "List":
+        model = QStandardItemModel()
+        for row in range(len(result)):
+            model.setItem(row, 0, QStandardItem(" ".join(result[row])))
+        displays[index].setModel(model)
+    elif pluginModules[index].TYPE == "Table":
+        hLabels, vLabels, table = result
+        model = QStandardItemModel()
+        model.setHorizontalHeaderLabels(hLabels)
+        model.setVerticalHeaderLabels(vLabels)
+        for row in range(len(vLabels)):
+            for col in range(len(hLabels)):
+                model.setItem(row, col, QStandardItem(table[row][col]))
+                model.item(row, col).setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+                font = QFont()
+                font.setPointSize(10)
+                model.item(row, col).setFont(font)
+        displays[index].setModel(model)
+        displays[index].horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        displays[index].show()
+
+def SetText(text):
+    ui.textBrowser.setText(text)
+
+def CheckButtonState(data):
+    ui.undo.setEnabled(data.undoFlag)
+    ui.backspace.setEnabled(data.backspaceFlag)
+    ui.redo.setEnabled(data.redoFlag)
+
+def PostfixExpression(revexp):
+    revexp = revexp.copy()
+    revexp.reverse()
+    convert_list, op_stack = [], []
+    for exp in revexp:
+        if exp in ops:
+            if exp == ')':
+                op_stack.append(exp)
+            elif exp == '(':
+                while True:
+                    op = op_stack.pop()
+                    if op ==')':
+                        break
+                    convert_list.append(op)
+                convert_list.append('()')
+            elif exp == '¬':
+                convert_list.append(exp)
+            else:
+                while op_stack and ops[op_stack[-1]] > ops[exp]:
+                    convert_list.append(op_stack.pop())
+                op_stack.append(exp)
+        else:
+            convert_list.append(exp)
+    while op_stack:
+        convert_list.append(op_stack.pop())
+    return convert_list
+
 class data_struct():
-
-    global ui
-
     def __init__(self, expressions = []):
-        self.ops = {'¬':3, '∧':2, '∨':2, '→':1, '↔':1, '(':0, ')':0, '()':0}
         self.expressions = expressions
         self.variabledict = {}
         self.variablepos = {}
         for exp in expressions:
-            if not exp in self.ops and exp != '0' and exp != '1':
+            if not exp in ops and exp != '0' and exp != '1':
                 if exp in self.variabledict:
                     self.variabledict[exp] += 1
                 else:
@@ -22,26 +108,24 @@ class data_struct():
         self.cursor = len(self.expressions)
         self.table = []
         self.expressions.insert(self.cursor, '_')
-        ui.textBrowser.setText(" ".join(self.expressions))
+        self.ExpressionToText()
         self.expressions.pop(self.cursor)
-        ui.undo.setEnabled(expressions != [])
-        ui.backspace.setEnabled(expressions != [])
-        ui.redo.setEnabled(False)
+        self.undoFlag = expressions != []
+        self.backspaceFlag = expressions != []
+        self.redoFlag = False
+        CheckButtonState(self)
         self.redolist = []
-        ui.display1.setModel(QStandardItemModel())
-        ui.display2.clear()
-        ui.display3.clear()
-        ui.display4.setModel(QStandardItemModel())
-        if self.expressions:
-            self.tablecalc()
+    
+    def ExpressionToText(self):
+        SetText(" ".join(self.expressions))
     
     def add_exp(self, exp, flag = True):
-        ui.undo.setEnabled(True)
-        ui.backspace.setEnabled(True)
+        self.undoFlag = True
+        self.backspaceFlag = True
         if flag:
-            ui.redo.setEnabled(False)
+            self.redoFlag = True
             self.redolist = []
-        valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
+        CheckButtonState(self)
         if self.expressions:
             if exp == '(':
                 if self.expressions[self.cursor - 1] in valid_ops:
@@ -55,7 +139,7 @@ class data_struct():
                 if self.expressions[self.cursor - 1] in valid_ops:
                     self.expressions.insert(self.cursor, exp)
                     self.cursor += 1
-            elif exp in self.ops:
+            elif exp in ops:
                 if not (self.expressions[self.cursor - 1] in valid_ops):
                     self.expressions.insert(self.cursor, exp)
                     self.cursor += 1
@@ -69,7 +153,7 @@ class data_struct():
                             self.variablepos[exp] = len(self.variablepos)
                     self.expressions.insert(self.cursor, exp)
                     self.cursor += 1
-                    self.tablecalc()
+                    Update()
         else:
             if exp == '(':
                 self.expressions.insert(self.cursor, ')')
@@ -80,7 +164,7 @@ class data_struct():
             elif exp == '¬':
                 self.expressions.insert(self.cursor, exp)
                 self.cursor += 1
-            elif exp in self.ops:
+            elif exp in ops:
                 pass
             else:
                 if exp != '0' and exp != '1':
@@ -91,13 +175,12 @@ class data_struct():
                         self.variablepos[exp] = len(self.variablepos)
                 self.expressions.insert(self.cursor, exp)
                 self.cursor += 1
-                self.tablecalc()
+                Update()
         self.expressions.insert(self.cursor, '_')
-        ui.textBrowser.setText(" ".join(self.expressions))
+        self.ExpressionToText()
         self.expressions.pop(self.cursor)
     
     def undo(self):
-        valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
         if self.expressions:
             self.cursor -= 1
             exp = self.expressions[self.cursor]
@@ -105,190 +188,34 @@ class data_struct():
                 self.expressions.pop(self.cursor)
             if exp == '(':
                 self.expressions.pop(self.cursor)
-            if not (exp in self.ops or exp == '0' or exp == '1'):
+            if not (exp in ops or exp == '0' or exp == '1'):
                 self.variabledict[exp] -= 1
                 if not self.variabledict[exp]:
                     del(self.variabledict[exp])
                     del(self.variablepos[exp])
             if self.cursor:
                 if not (self.expressions[self.cursor - 1] in valid_ops):
-                    self.tablecalc()
+                    Update()
             else:
                 lst = self.redolist
                 self.__init__()
-                ui.redo.setEnabled(True)
                 self.redolist = lst
         
         self.expressions.insert(self.cursor, '_')
-        ui.textBrowser.setText(" ".join(self.expressions))
+        self.ExpressionToText()
         self.expressions.pop(self.cursor)
-        ui.redo.setEnabled(True)
+        self.redoFlag = True
         self.redolist.append(exp)
+        CheckButtonState(self)
     
     def redo(self):
         self.add_exp(self.redolist.pop(), False)
-        ui.redo.setEnabled(self.redolist != [])
+        self.redoFlag = self.redolist != []
+        CheckButtonState(self)
 
-    def tablecalc(self):
-
-        def reverse_calc(revexp):
-            revexp.reverse()
-            convert_list, op_stack = [], []
-            for exp in revexp:
-                if exp in self.ops:
-                    if exp == ')':
-                        op_stack.append(exp)
-                    elif exp == '(':
-                        while True:
-                            op = op_stack.pop()
-                            if op ==')':
-                                break
-                            convert_list.append(op)
-                        convert_list.append('()')
-                    elif exp == '¬':
-                        convert_list.append(exp)
-                    else:
-                        while op_stack and self.ops[op_stack[-1]] > self.ops[exp]:
-                            convert_list.append(op_stack.pop())
-                        op_stack.append(exp)
-                else:
-                    convert_list.append(exp)
-            while op_stack:
-                convert_list.append(op_stack.pop())
-            return convert_list
-        
-        convert_list = reverse_calc(self.expressions.copy())
-        
-        def calc(expressions):
-            
-            nonlocal self
-
-            def printans(x):
-                self.table.append(x)
-                return x
-
-            exp = expressions.pop()
-            if exp == '0' or exp == '1':
-                return [exp], [exp == '1' for _ in range(2 ** len(self.variablepos))]
-            elif exp in self.variablepos:
-                return [exp], [_ & 1 << (len(self.variablepos) - self.variablepos[exp] - 1)\
-                    for _ in range(2 ** len(self.variablepos))]
-            else:
-                if exp == '¬':
-                    return printans((lambda x:([exp] + x[0], [not _ for _ in x[1]]))(calc(expressions)))
-                elif exp == '()':
-                    return (lambda x:(['('] + x[0] + [')'], x[1]))(calc(expressions))
-                elif exp == '∧':
-                    return printans((lambda x, y:(x[0] + [exp] + y[0], [x[1][_] and y[1][_]\
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
-                elif exp == '∨':
-                    return printans((lambda x, y:(x[0] + [exp] + y[0], [x[1][_] or y[1][_] \
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
-                elif exp == '→':
-                    return printans((lambda x, y:(x[0] + [exp] + y[0], [not x[1][_] or y[1][_]\
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
-                elif exp == '↔':
-                    return printans((lambda x, y:(x[0] + [exp] + y[0], [(not x[1][_] or y[1][_]) and (x[1][_] or not y[1][_])\
-                        for _ in range(len(x[1]))]))(calc(expressions), calc(expressions)))
-
-        self.table = []
-        for exp in self.variablepos.keys():
-            self.table.append(([exp], [_ & 1 << (len(self.variablepos) - self.variablepos[exp] - 1)\
-                for _ in range(2 ** len(self.variablepos))]))
-        calc(convert_list.copy())
-        model=QStandardItemModel()
-        model.setHorizontalHeaderLabels([(lambda x:" ".join(x[0]))(_) for _ in self.table])
-        model.setVerticalHeaderLabels(["m" + str(_) for _ in range(2 ** len(self.variabledict))])
-        for row in range(2 ** len(self.variabledict)):
-            for col in range(len(self.table)):
-                model.setItem(row, col, QStandardItem("1" if self.table[col][1][row] else "0"))
-                model.item(row, col).setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-                font = QFont()
-                font.setPointSize(10)
-                model.item(row, col).setFont(font)
-        ui.display1.setModel(model)
-        ui.display1.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        ui.display1.show()
-        lst = []
-        for _ in range(2 ** len(self.variablepos)):
-            if self.table[-1][1][_]:
-                lst.append("m" + str(_))
-        ui.display2.setText(" ∨ ".join(lst))
-        lst = []
-        for _ in range(2 ** len(self.variablepos)):
-            if not self.table[-1][1][_]:
-                lst.append("m" + str(_))
-        ui.display3.setText(" ∧ ".join(lst))
-        
-        def braket(x):
-            return x if len(x) == 1 else ['('] + x + [')']
-
-        def convert(expressions):
-            
-            nonlocal self
-
-            exp = expressions.pop()
-            if exp == '0' or exp == '1':
-                return ([exp],)
-            elif exp in self.variablepos:
-                return ([exp],)
-            else:
-                if exp == '¬':
-                    return (lambda x:([exp] + x[0],))(convert(expressions))
-                elif exp == '()':
-                    return (lambda x:(braket(x[0]),))(convert(expressions))
-                elif exp == '∧':
-                    return (lambda x, y:(braket(x[0]) + [exp] + braket(y[0]),))(convert(expressions), convert(expressions))
-                elif exp == '∨':
-                    return (lambda x, y:(braket(x[0]) + [exp] + braket(y[0]),))(convert(expressions), convert(expressions))
-                elif exp == '→':
-                    return (lambda x, y:(['¬'] + braket(x[0]) + ['∨'] + braket(y[0]),))\
-                        (convert(expressions), convert(expressions))
-                elif exp == '↔':
-                    return (lambda x, y:(braket(['¬'] + braket(x[0]) + ['∨'] + braket(y[0])) + ['∧']\
-                          + braket(braket(x[0]) + ['∨', '¬'] + braket(y[0])),))(convert(expressions),\
-                              convert(expressions))
-
-        def convert1(expressions):
-            
-            nonlocal self
-
-            exp = expressions.pop()
-            if exp == '0' or exp == '1':
-                return ([exp],)
-            elif exp in self.variablepos:
-                return ([exp],)
-            else:
-                if exp == '¬':
-                    return (lambda x:([exp] + x[0],))(convert1(expressions))
-                elif exp == '()':
-                    return (lambda x:(braket(x[0]),))(convert1(expressions))
-                elif exp == '∧':
-                    return (lambda x, y:(braket(x[0]) + [exp] + braket(y[0]),))(convert1(expressions), convert1(expressions))
-                elif exp == '∨':
-                    return (lambda x, y:(['¬'] + braket(['¬'] + braket(x[0]) + ['∧', '¬'] + braket(y[0])),))(convert1(expressions), convert1(expressions))
-
-        result1 = convert(convert_list.copy())
-        result2 = convert1(reverse_calc(result1[0].copy()))
-        model1=QStandardItemModel()
-        model1.setItem(0, 0, QStandardItem(" ".join(result1[0])))
-        model1.setItem(1, 0, QStandardItem(" ".join(result2[0])))
-        ui.display4.setModel(model1)
-
-class mywindow(QMainWindow):
-    def __init__(self):
-        super(mywindow, self).__init__(None)
-
-def ui_setup(lst = []):
-    global ui
-    
-    import gui
-    app = QApplication(sys.argv)
-    MainWindow = mywindow()
-    ui = gui.Ui_MainWindow()
-    ui.setupUi(MainWindow)
-
-    data = data_struct(lst)
+def ui_setup():
+    Update()
+    ui.tabWidget.currentChanged.connect(Update)
 
     def confirm_input():
         var = ui.varinput.toPlainText()
@@ -350,5 +277,15 @@ def ui_setup(lst = []):
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
-    import compileUi
-    ui_setup(['(', 'a', '→', 'b', '∨', 'b', ')' ,'∧', 'c'])
+    app = QApplication(sys.argv)
+    MainWindow = QMainWindow()
+    # import compileUi
+    import gui
+    ui = gui.Ui_MainWindow()
+    ui.setupUi(MainWindow)
+    LoadPlugins()
+    
+    initalList = ['(', 'a', '→', 'b', '∨', 'b', ')' ,'∧', 'c']
+    data = data_struct(initalList)
+
+    ui_setup()
