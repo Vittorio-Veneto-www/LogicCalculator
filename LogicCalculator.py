@@ -10,6 +10,9 @@ valid_ops = {'¬', '∧', '∨', '→', '↔', '('}
 pluginModules = []
 displays = []
 
+def BrowsePlugins():
+    os.startfile(os.path.join(os.path.dirname(__file__), "plugins"))
+
 def LoadPlugins():
     PATH = os.path.join(os.path.dirname(__file__), "plugins")
     if not os.path.exists(PATH):
